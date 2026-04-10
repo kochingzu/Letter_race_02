@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書信稱謂賽馬大考驗</title>
+    
+    <!-- 引入 Tailwind CSS 進行樣式排版 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 React 與 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 引入 Babel 以便在瀏覽器中直接解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 引入 canvas-confetti 進行煙火特效 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* 自定義簡單動畫 */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-slide-in { animation: slideIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- 題目資料庫 ---
+        const ALL_QUESTIONS = [
+            { question: "對「父母親」的提稱語應該使用下列何者？", options: ["膝下", "函丈", "惠鑒", "大鑒"], answerIndex: 0, explanation: "「膝下」用於父母或祖父母；「函丈」用於老師；「惠鑒」、「大鑒」用於平輩。" },
+            { question: "在書信中提到「自己的父母」，應謙稱為？", options: ["尊翁 / 尊堂", "家父 / 家母", "舍弟 / 舍妹", "令尊 / 令堂"], answerIndex: 1, explanation: "稱呼自己的長輩用「家」；稱呼對方的長輩用「令」或「尊」。" },
+            { question: "寫信給「一般長輩」，結尾請安語應使用？", options: ["順頌 時綏", "敬請 鈞安", "叩請 金安", "順候 近祉"], answerIndex: 1, explanation: "「敬請 鈞安」用於一般長輩；「叩請 金安」用於祖父母或父母；「順頌 時綏」用於平輩。" },
+            { question: "「信封」上對收信人（長輩）的「啟封詞」應寫？", options: ["敬啟", "安啟", "鈞啟", "拜啟"], answerIndex: 2, explanation: "「鈞啟」、「賜啟」用於長輩。注意：「敬啟」是指發信人恭敬地打開，絕不可用於請別人收信。" },
+            { question: "寄信給「平輩」，提稱語可以使用？", options: ["尊前", "大鑒", "道鑒", "知悉"], answerIndex: 1, explanation: "「大鑒」、「惠鑒」、「台鑒」皆可用於平輩。" },
+            { question: "對他人稱呼「自己的妻子」，應使用？", options: ["內人 / 拙荊", "尊夫人", "令堂", "舍妹"], answerIndex: 0, explanation: "稱呼自己的妻子用「內人」、「拙荊」；稱呼他人的妻子用「尊夫人」、「嫂夫人」。" },
+            { question: "書信結構中，接在稱謂之後，用來「請對方讀信」的詞語是？", options: ["啟辭", "提稱語", "結尾祝辭", "署名"], answerIndex: 1, explanation: "提稱語的作用是請對方讀信，例如：父親大人「膝下」。" },
+            { question: "寫信給「老師」，提稱語應使用？", options: ["膝下", "函丈 / 道鑒", "大鑒", "青鑒"], answerIndex: 1, explanation: "「函丈」、「道鑒」、「賜鑒」常用於師長。" },
+            { question: "信封上稱呼對方的公司或商店，應寫？", options: ["敝公司", "寶號 / 貴公司", "小店", "尊處"], answerIndex: 1, explanation: "尊稱對方的商店為「寶號」，公司為「貴公司」；謙稱自己為「敝公司」、「小店」。" },
+            { question: "「舍」字通常用來謙稱自己的？", options: ["長輩", "晚輩或卑幼親屬", "平輩", "老師"], answerIndex: 1, explanation: "「舍」用於謙稱比自己卑幼的親屬，如舍弟、舍妹、舍親。" },
+            { question: "稱呼「別人的兒子」，應使用下列何者？", options: ["小犬", "豚兒", "令郎", "令愛"], answerIndex: 2, explanation: "稱呼別人的兒子為「令郎」；自己的兒子謙稱為「小犬」、「豚兒」；別人女兒為「令愛/令媛」。" },
+            { question: "寄「明信片」給平輩，收件人姓名下方應寫？", options: ["啟", "收", "敬啟", "拆"], answerIndex: 1, explanation: "明信片不加封套，別人一眼就能看到內容，因此不能用「啟」(打開)，只能用「收」。" },
+            { question: "訃文中稱呼逝世的「母親」，應寫？", options: ["顯考", "顯妣", "先夫", "故友"], answerIndex: 1, explanation: "逝世的父親稱為「顯考」(或先考)，逝世的母親稱為「顯妣」(或先妣)。" },
+            { question: "寫信給「晚輩」，結尾請安語可以使用？", options: ["敬請 鈞安", "恭請 福安", "順頌 日祉", "叩請 金安"], answerIndex: 2, explanation: "「順頌 日祉」、「即問 近好」等用於晚輩；其餘皆用於長輩。" },
+            { question: "下列哪一種信封啟封詞是「絕對錯誤」，會顯得非常不禮貌？", options: ["王大明 鈞啟", "王大明 敬啟", "王大明 大啟", "王大明 台啟"], answerIndex: 1, explanation: "「敬啟」意思是發信人恭敬地開啟，寫在信封上等於叫收信人恭敬地打開，非常失禮。" }
+        ];
+
+        // --- 挑戰任務題庫 (正答、錯答、誘答、瞎答) ---
+        const CHALLENGE_QUESTIONS = [
+            { question: "【挑戰任務】在信封上，如果對方是「平輩」，下列哪一個「啟封詞」最恰當？", options: ["台啟 / 大啟", "敬啟", "鈞啟", "芝麻開門"], answerIndex: 0, explanation: "「台啟/大啟」用於平輩(正答)；「敬啟」絕對不可用(錯答)；「鈞啟」用於長輩(誘答)；「芝麻開門」是來亂的(瞎答)！" },
+            { question: "【挑戰任務】要稱呼「對方的母親」，應該使用下列哪一個稱謂？", options: ["令堂", "家母", "尊翁", "超級媽咪"], answerIndex: 0, explanation: "「令堂」稱呼對方母親(正答)；「家母」稱呼自己母親(錯答)；「尊翁」稱呼對方父親(誘答)；「超級媽咪」太過口語(瞎答)！" },
+            { question: "【挑戰任務】寫信給「老師」時，最適合的提稱語是？", options: ["函丈", "膝下", "大鑒", "魔法降臨"], answerIndex: 0, explanation: "「函丈」用於老師(正答)；「膝下」用於父母(錯答)；「大鑒」用於平輩(誘答)；「魔法降臨」是奇幻小說才用的(瞎答)！" },
+            { question: "【挑戰任務】對別人稱呼「自己的兒子」，應該謙稱為？", options: ["小犬", "令郎", "舍弟", "汪星人"], answerIndex: 0, explanation: "「小犬」是謙稱自己的兒子(正答)；「令郎」是尊稱對方的兒子(錯答)；「舍弟」是謙稱自己的弟弟(誘答)；「汪星人」是真狗啦(瞎答)！" },
+            { question: "【挑戰任務】寫信給「長輩」，結尾的請安語應該寫？", options: ["敬請 鈞安", "順頌 時綏", "叩請 聖安", "祝你天天開心"], answerIndex: 0, explanation: "「敬請 鈞安」用於長輩(正答)；「順頌 時綏」用於平輩(錯答)；「聖安」是對神明或皇帝(誘答)；「天天開心」不符合書信格式(瞎答)！" }
+        ];
+
+        // --- 遊戲常數 ---
+        const TOTAL_DISTANCE = 100;
+        const PLAYER_SPEED_PER_CORRECT = 12.5; // 玩家答對一次前進 12.5% (需答對 8 題才能抵達終點)
+        const CPU_BASE_SPEED = 0.08; // 降低 CPU 基礎移動速度，配合 8 題的節奏，確保玩家有優勢
+        const TIME_LIMIT = 15; // 每題 15 秒
+
+        // --- 音效控制器 (使用 Web Audio API) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const playSound = (type) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'wrong' || type === 'timeout') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(250, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'win') {
+                osc.type = 'square';
+                gainNode.gain.setValueAtTime(0.1, now);
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554.37, now + 0.1);
+                osc.frequency.setValueAtTime(659.25, now + 0.2);
+                osc.frequency.setValueAtTime(880, now + 0.3);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                osc.start(now);
+                osc.stop(now + 0.8);
+            }
+        };
+
+        // --- 煙火特效 ---
+        const triggerFireworks = () => {
+            var duration = 3 * 1000;
+            var animationEnd = Date.now() + duration;
+            var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            var interval = setInterval(function() {
+                var timeLeft = animationEnd - Date.now();
+                if (timeLeft <= 0) {
+                    return clearInterval(interval);
+                }
+                var particleCount = 50 * (timeLeft / duration);
+                confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            }, 250);
+        };
+
+        function App() {
+            const [gameState, setGameState] = useState('START'); // 'START', 'PLAYING', 'GAME_OVER'
+            const [questions, setQuestions] = useState([]);
+            const [currentQIndex, setCurrentQIndex] = useState(0);
+            const [timeLeft, setTimeLeft] = useState(TIME_LIMIT);
+            
+            const [progress, setProgress] = useState([0, 0, 0, 0]);
+            const [rankings, setRankings] = useState([]); 
+            
+            const [feedback, setFeedback] = useState(null); 
+            const [stats, setStats] = useState({ correct: 0, wrong: 0, timeout: 0 });
+
+            const timerRef = useRef(null);
+            const raceRef = useRef(null);
+
+            const startGame = () => {
+                // 解除瀏覽器音效限制
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                // 1. 隨機選取 10 題一般題目
+                const shuffledRegs = [...ALL_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 10);
+                
+                // 2. 隨機選取 5 題挑戰任務
+                const shuffledChalls = [...CHALLENGE_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 5);
+
+                // 3. 組合題目：每 2 題一般題目後，插入 1 題挑戰任務
+                let combinedQuestions = [];
+                let challIndex = 0;
+                shuffledRegs.forEach((q, idx) => {
+                    combinedQuestions.push({ ...q, isChallenge: false });
+                    if ((idx + 1) % 2 === 0 && challIndex < shuffledChalls.length) {
+                        combinedQuestions.push({ ...shuffledChalls[challIndex], isChallenge: true });
+                        challIndex++;
+                    }
+                });
+
+                // 4. 針對每一題，打亂其選項順序並重新定位正確答案索引
+                const selectedQuestions = combinedQuestions.map(q => {
+                    const optionsWithMeta = q.options.map((opt, idx) => ({
+                        text: opt,
+                        isCorrect: idx === q.answerIndex
+                    }));
+                    
+                    optionsWithMeta.sort(() => Math.random() - 0.5);
+                    
+                    return {
+                        ...q,
+                        options: optionsWithMeta.map(o => o.text),
+                        answerIndex: optionsWithMeta.findIndex(o => o.isCorrect)
+                    };
+                });
+
+                setQuestions(selectedQuestions);
+                setCurrentQIndex(0);
+                setProgress([0, 0, 0, 0]);
+                setRankings([]);
+                setStats({ correct: 0, wrong: 0, timeout: 0 });
+                setFeedback(null);
+                setTimeLeft(TIME_LIMIT);
+                setGameState('PLAYING');
+            };
+
+            useEffect(() => {
+                if (gameState === 'PLAYING') {
+                    timerRef.current = setInterval(() => {
+                        setTimeLeft((prev) => {
+                            if (prev <= 1) {
+                                handleTimeout();
+                                return TIME_LIMIT;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
+
+                    raceRef.current = setInterval(() => {
+                        setProgress((prev) => {
+                            const newProgress = [...prev];
+                            let playerFinished = false;
+
+                            for (let i = 1; i < 4; i++) {
+                                if (newProgress[i] < TOTAL_DISTANCE) {
+                                    // 配合新節奏，稍微調慢 CPU 的隨機衝刺速度
+                                    const speed = CPU_BASE_SPEED + Math.random() * 0.08;
+                                    newProgress[i] = Math.min(TOTAL_DISTANCE, newProgress[i] + speed);
+                                    if (newProgress[i] >= TOTAL_DISTANCE && !rankings.includes(i)) {
+                                        setRankings(prevRanks => [...prevRanks, i]);
+                                    }
+                                }
+                            }
+
+                            if (newProgress[0] >= TOTAL_DISTANCE) {
+                                playerFinished = true;
+                                if (!rankings.includes(0)) {
+                                    setRankings(prevRanks => [...prevRanks, 0]);
+                                }
+                            }
+
+                            const finishedCount = newProgress.filter(p => p >= TOTAL_DISTANCE).length;
+                            if (playerFinished || (finishedCount >= 3 && !playerFinished)) {
+                                if (finishedCount >= 3 && !playerFinished && !rankings.includes(0)) {
+                                    setRankings(prevRanks => [...prevRanks, 0]);
+                                }
+                                clearInterval(timerRef.current);
+                                clearInterval(raceRef.current);
+                                setTimeout(() => {
+                                    setGameState('GAME_OVER');
+                                    playSound('win');
+                                    triggerFireworks();
+                                }, 500);
+                            }
+
+                            return newProgress;
+                        });
+                    }, 100);
+
+                    return () => {
+                        clearInterval(timerRef.current);
+                        clearInterval(raceRef.current);
+                    };
+                }
+            }, [gameState, rankings]); 
+
+            const handleTimeout = () => {
+                if (feedback !== null) return;
+                setFeedback('timeout');
+                playSound('timeout');
+                setStats(s => ({ ...s, timeout: s.timeout + 1 }));
+                pauseAndNext();
+            };
+
+            const handleAnswer = (selectedIndex) => {
+                if (feedback !== null) return; 
+
+                const isCorrect = selectedIndex === questions[currentQIndex].answerIndex;
+                
+                if (isCorrect) {
+                    playSound('correct');
+                    setFeedback('correct');
+                    setStats(s => ({ ...s, correct: s.correct + 1 }));
+                    
+                    setProgress(prev => {
+                        const newProgress = [...prev];
+                        newProgress[0] = Math.min(TOTAL_DISTANCE, newProgress[0] + PLAYER_SPEED_PER_CORRECT);
+                        if (newProgress[0] >= TOTAL_DISTANCE && !rankings.includes(0)) {
+                           setRankings(r => [...r, 0]);
+                        }
+                        return newProgress;
+                    });
+                } else {
+                    playSound('wrong');
+                    setFeedback('wrong');
+                    setStats(s => ({ ...s, wrong: s.wrong + 1 }));
+                }
+
+                pauseAndNext();
+            };
+
+            const pauseAndNext = () => {
+                clearInterval(timerRef.current); 
+                setTimeout(() => {
+                    setFeedback(null);
+                    setTimeLeft(TIME_LIMIT);
+                    
+                    if (currentQIndex < questions.length - 1) {
+                        setCurrentQIndex(prev => prev + 1);
+                        timerRef.current = setInterval(() => {
+                            setTimeLeft((prev) => {
+                                if (prev <= 1) {
+                                    handleTimeout();
+                                    return TIME_LIMIT;
+                                }
+                                return prev - 1;
+                            });
+                        }, 1000);
+                    } else {
+                        clearInterval(raceRef.current);
+                        setGameState('GAME_OVER');
+                        playSound('win');
+                        triggerFireworks();
+                    }
+                }, 2000); 
+            };
+
+            const renderTrack = (horseIndex, name, emoji, colorClass) => {
+                const currentProg = progress[horseIndex];
+                return (
+                    <div key={horseIndex} className="relative w-full h-20 bg-green-800 rounded-sm mb-2 border-2 border-green-900 overflow-hidden shadow-inner">
+                        <div className="absolute top-1/2 left-0 w-full border-t border-dashed border-white/30"></div>
+                        <div className="absolute right-0 top-0 bottom-0 w-8 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJ3aGl0ZSIvPjxyZWN0IHg9IjEwIiB5PSIxMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJ3aGl0ZSIvPjxyZWN0IHg9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9ImJsYWNrIi8+PHJlY3QgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iYmxhY2siLz48L3N2Zz4=')] opacity-80 z-0"></div>
+                        <div 
+                            className="absolute top-1 z-10 transition-all duration-100 ease-linear flex flex-col items-center gap-1"
+                            style={{ left: `calc(${currentProg}% - 2.5rem)` }}
+                        >
+                            <div className="text-5xl filter drop-shadow-md">{emoji}</div>
+                            <div className={`text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap shadow-sm ${colorClass}`}>
+                                {name}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div 
+                    className="min-h-screen flex items-center justify-center p-4 font-sans text-gray-800"
+                    style={{ backgroundImage: "url('背景.png')", backgroundSize: "cover", backgroundPosition: "center", backgroundAttachment: "fixed" }}
+                >
+                    <div className="w-full max-w-5xl bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+                        
+                        <div className="bg-amber-600 text-white p-4 flex justify-between items-center shadow-md">
+                            <h1 className="text-2xl font-bold flex items-center gap-2">
+                                <span>🏁</span> 書信稱謂賽馬大考驗
+                            </h1>
+                            {gameState === 'PLAYING' && (
+                                <div className="flex items-center gap-2 bg-amber-800 px-3 py-1 rounded-full font-mono text-lg font-bold">
+                                    <span>⏱️</span>
+                                    <span className={timeLeft <= 5 ? 'text-red-300 animate-pulse' : 'text-white'}>
+                                        00:{timeLeft.toString().padStart(2, '0')}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6">
+                            
+                            {gameState === 'START' && (
+                                <div className="text-center py-8">
+                                    <div className="text-6xl mb-6">🏇💨</div>
+                                    <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-red-600 mb-6 drop-shadow-sm">歡迎來到【國文書信盃】大獎賽！</h2>
+                                    <div className="bg-amber-50/90 rounded-2xl p-6 text-left max-w-2xl mx-auto mb-8 border-2 border-amber-300 shadow-lg transform rotate-1 hover:rotate-0 transition-transform">
+                                        <h3 className="font-bold text-amber-800 mb-4 flex items-center gap-2 text-2xl border-b-2 border-amber-200 pb-2">
+                                            <span>📣</span> 賽事播報台：熱血規則看這邊！
+                                        </h3>
+                                        <ul className="list-none space-y-4 text-gray-800 text-lg">
+                                            <li className="flex gap-3 items-start"><span className="text-2xl">🏇</span> <span><strong>強敵環伺：</strong> 你將騎乘專屬的「學霸馬」，與傳說中的三大名駒——<span className="text-red-600 font-bold">赤兔馬</span>、<span className="text-yellow-600 font-bold">的盧馬</span>、<span className="text-purple-600 font-bold">絕影馬</span> 展開頂尖對決！</span></li>
+                                            <li className="flex gap-3 items-start"><span className="text-2xl">🧠</span> <span><strong>腦力衝刺：</strong> 每題限時 <strong className="text-red-600 text-xl animate-pulse">15秒</strong>！只要答對一題，學霸馬就會發動渦輪增壓往前衝（<strong className="text-blue-600">答對 8 題</strong>即可霸氣奪冠🏆！）。</span></li>
+                                            <li className="flex gap-3 items-start"><span className="text-2xl">⚠️</span> <span><strong>失誤懲罰：</strong> 哎呀！要是答錯或超時，馬兒就會停在原地吃草懷疑人生喔...</span></li>
+                                            <li className="flex gap-3 items-start"><span className="text-2xl">🔥</span> <span><strong>無情對手：</strong> 電腦是不會等你的！發揮你最快的手速與最強的國文大腦，把它們甩在後頭吃灰塵吧！</span></li>
+                                        </ul>
+                                    </div>
+                                    <button 
+                                        onClick={startGame}
+                                        className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-2xl font-black py-4 px-12 rounded-full shadow-xl transform transition hover:scale-110 active:scale-95 flex items-center gap-2 mx-auto"
+                                    >
+                                        <span>🏁</span> 槍聲響起，準備出發！
+                                    </button>
+                                </div>
+                            )}
+
+                            {gameState === 'PLAYING' && (
+                                <div className="flex flex-col gap-6">
+                                    <div className="bg-green-100 p-4 rounded-xl border border-green-300 shadow-inner">
+                                        {renderTrack(0, '學霸馬 (你)', '🏇', 'bg-blue-600 text-white')}
+                                        {renderTrack(1, '赤兔馬 (CPU)', '🐎', 'bg-red-600 text-white')}
+                                        {renderTrack(2, '的盧馬 (CPU)', '🐎', 'bg-yellow-500 text-gray-900')}
+                                        {renderTrack(3, '絕影馬 (CPU)', '🐎', 'bg-purple-600 text-white')}
+                                    </div>
+
+                                    <div className={`relative rounded-xl p-6 border min-h-[300px] flex flex-col justify-center transition-colors ${questions[currentQIndex]?.isChallenge ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-200'}`}>
+                                        <div className="text-sm font-bold mb-2">
+                                            {questions[currentQIndex]?.isChallenge ? (
+                                                <span className="text-red-600 animate-pulse text-lg">🚨 挑戰任務來襲！分數照算，快作答！</span>
+                                            ) : (
+                                                <span className="text-blue-600">第 {currentQIndex + 1} / {questions.length} 題</span>
+                                            )}
+                                        </div>
+                                        <h2 className="text-2xl font-bold text-gray-800 mb-6 leading-relaxed">
+                                            {questions[currentQIndex]?.question}
+                                        </h2>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {questions[currentQIndex]?.options.map((opt, idx) => {
+                                                let btnClass = "bg-white hover:bg-blue-100 border-2 border-gray-200 text-gray-800";
+                                                if (questions[currentQIndex]?.isChallenge) {
+                                                    btnClass = "bg-white hover:bg-red-100 border-2 border-red-200 text-gray-800";
+                                                }
+                                                
+                                                if (feedback !== null) {
+                                                   if (idx === questions[currentQIndex].answerIndex) {
+                                                       btnClass = "bg-green-100 border-2 border-green-500 text-green-800"; 
+                                                   } else {
+                                                       btnClass = "bg-gray-100 border-2 border-gray-200 text-gray-400 opacity-60"; 
+                                                   }
+                                                }
+
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleAnswer(idx)}
+                                                        disabled={feedback !== null}
+                                                        className={`text-lg font-medium p-4 rounded-xl shadow-sm transition-all text-left ${btnClass}`}
+                                                    >
+                                                        {String.fromCharCode(65 + idx)}. {opt}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {feedback && (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm rounded-xl z-20 animate-fade-in">
+                                                <div className="flex items-center gap-3 text-4xl font-bold mb-4">
+                                                    {feedback === 'correct' && <><span className="text-green-500">✅</span> <span className="text-green-600">答對了！加速前進！</span></>}
+                                                    {feedback === 'wrong' && <><span className="text-red-500">❌</span> <span className="text-red-600">答錯了...</span></>}
+                                                    {feedback === 'timeout' && <><span className="text-orange-500">⏱️</span> <span className="text-orange-600">時間到！</span></>}
+                                                </div>
+                                                <div className={`px-8 py-4 rounded-lg max-w-xl text-center border shadow-sm ${questions[currentQIndex]?.isChallenge ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+                                                    <span className={`font-bold ${questions[currentQIndex]?.isChallenge ? 'text-red-800' : 'text-blue-800'}`}>💡 解析：</span>
+                                                    <span className="text-gray-700">{questions[currentQIndex]?.explanation}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {gameState === 'GAME_OVER' && (
+                                <div className="text-center py-6 animate-slide-in">
+                                    <div className="text-7xl mx-auto mb-4">🏆</div>
+                                    <h2 className="text-4xl font-black text-gray-800 mb-2">比賽結束！</h2>
+                                    
+                                    <div className="my-8">
+                                        <div className="text-xl text-gray-600 mb-2">你的最終名次</div>
+                                        <div className="text-5xl md:text-6xl font-bold text-amber-600 flex items-center justify-center gap-4">
+                                            {rankings.indexOf(0) === 0 ? '🏆 第 1 名 🥇' : 
+                                             rankings.indexOf(0) === 1 ? '第 2 名 🥈' :
+                                             rankings.indexOf(0) === 2 ? '第 3 名 🥉' : '第 4 名 😭'}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-gray-50 rounded-2xl p-6 flex justify-center gap-8 max-w-md mx-auto mb-8 border border-gray-200 shadow-sm">
+                                        <div className="text-center">
+                                            <div className="text-sm text-gray-500 mb-1">答對</div>
+                                            <div className="text-3xl font-bold text-green-600">{stats.correct}</div>
+                                        </div>
+                                        <div className="w-px bg-gray-300"></div>
+                                        <div className="text-center">
+                                            <div className="text-sm text-gray-500 mb-1">答錯</div>
+                                            <div className="text-3xl font-bold text-red-500">{stats.wrong}</div>
+                                        </div>
+                                        <div className="w-px bg-gray-300"></div>
+                                        <div className="text-center">
+                                            <div className="text-sm text-gray-500 mb-1">超時</div>
+                                            <div className="text-3xl font-bold text-orange-500">{stats.timeout}</div>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={startGame}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold py-3 px-8 rounded-full shadow-md transform transition hover:scale-105 active:scale-95 flex items-center gap-2 mx-auto"
+                                    >
+                                        <span>🔄</span> 再挑戰一次
+                                    </button>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
